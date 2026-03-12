@@ -297,6 +297,6 @@ class UnitYDataLoader:
         )
 
     def _load_manifest(self, dataset_manifest_path: str) -> Dataset:
-        with open(dataset_manifest_path) as fp_in:
+        with open(dataset_manifest_path, encoding="utf-8") as fp_in:
             dataset = [json.loads(line) for line in fp_in]
             return Dataset.from_list(dataset)

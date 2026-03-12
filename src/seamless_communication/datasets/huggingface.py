@@ -28,7 +28,7 @@ class SpeechTokenizer:
 class Speech2SpeechFleursDatasetBuilder:
     """Assembles speech2speech dataset from google/fleurs on HuggingFace"""
 
-    DATASET_NAME = "google/fleurs"
+    DATASET_NAME = "hungzin/viet_muong_merged_0_200_denoise_silence_speaker101"
 
     def __init__(
         self,
@@ -60,10 +60,8 @@ class Speech2SpeechFleursDatasetBuilder:
         sampling_rate: Optional[int] = None,
     ) -> MultimodalSample:
         should_skip_audio = (
-            lang == self.target_lang
-            and self.skip_target_audio
-            or lang == self.source_lang
-            and self.skip_source_audio
+            # if source and target lang are the same, still get the audio units
+            self.skip_target_audio
             or waveform_npy is None
         )
         if not should_skip_audio:

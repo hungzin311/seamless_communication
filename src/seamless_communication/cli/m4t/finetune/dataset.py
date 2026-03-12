@@ -146,7 +146,7 @@ def download_fleurs(
         split=split,
     )
     manifest_path: str = os.path.join(save_directory, f"{split}_manifest.json")
-    with open(manifest_path, "w") as fp_out:
+    with open(manifest_path, "w", encoding="utf-8") as fp_out:
         for idx, sample in enumerate(dataset_iterator.__iter__(), start=1):
             # correction as FleursDatasetBuilder return fleurs lang codes
             sample.source.lang = source_lang
@@ -231,15 +231,7 @@ def init_parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = init_parser().parse_args()
-    assert args.name in SUPPORTED_DATASETS, \
-        f"The only supported datasets are `{SUPPORTED_DATASETS}`. Please use one of these in `--name`."
-
-    if args.name == 'google/fleurs':
-        download_fleurs(args.source_lang, args.target_lang, args.split, args.save_dir)
-    elif args.name == 'speechcolab/gigaspeech':
-        assert args.huggingface_token is not None, \
-            "Your HuggingFace token is necessary for GigaSpeech. Please read the GigaSpeech agreement."
-        download_gigaspeech(args.split, args.huggingface_token, args.save_dir)
+    download_fleurs(args.source_lang, args.target_lang, args.split, args.save_dir)
 
 
 if __name__ == "__main__":
