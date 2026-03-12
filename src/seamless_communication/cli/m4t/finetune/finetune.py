@@ -9,6 +9,7 @@ import logging
 import os
 from pathlib import Path
 
+import wandb
 import torch
 
 from seamless_communication.cli.m4t.finetune import dataloader, dist_utils, trainer
@@ -24,7 +25,6 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger("finetune")
-
 
 def init_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -84,25 +84,25 @@ def init_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--learning_rate",
         type=float,
-        default=1e-7,
+        default=1e-5,
         help=("Finetuning learning rate"),
     )
     parser.add_argument(
         "--warmup_steps",
         type=int,
-        default=100,
+        default=1000,
         help=("Number of steps with linearly increasing learning rate"),
     )
     parser.add_argument(
         "--eval_steps",
         type=int,
-        default=50,
+        default=100,
         help=("Get eval loss after each `eval_steps` training steps "),
     )
     parser.add_argument(
         "--log_steps",
         type=int,
-        default=10,
+        default=20,
         help=("Log inner loss after each `log_steps` training steps"),
     )
     parser.add_argument(
@@ -163,6 +163,23 @@ def main() -> None:
         eval_steps=args.eval_steps,
         log_steps=args.log_steps,
     )
+
+    if dist_utils.is_main_process():
+        wandb.init(project="seamless_communication", name="finetune")
+        wandb.config.update(
+            {
+                "model_name": args.model_name,
+                "finetune_mode": args.mode.value,
+                "max_epochs": args.max_epochs,
+                "warmup_steps": args.warmup_steps,
+                "log_steps": args.log_steps,
+                "eval_steps": args.eval_steps,
+                "patience": args.patience,
+                "learning_rate": args.learning_rate,
+                "train_batch_size": args.batch_size,
+                "eval_batch_size": args.batch_size,
+            }
+        )
     
     logger.info(f"Finetune Params: {finetune_params}")
     

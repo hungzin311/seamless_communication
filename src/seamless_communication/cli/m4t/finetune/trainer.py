@@ -17,13 +17,13 @@ from typing import List, Optional, Tuple, Union
 import torch
 import torch.distributed as dist
 import torch.nn as nn
+import wandb
 from fairseq2.data import VocabularyInfo
 from fairseq2.models.sequence import SequenceModelOutput
 from fairseq2.nn.padding import PaddingMask
 from fairseq2.optim.lr_scheduler import MyleLR
 from fairseq2.typing import Device
 from torch.optim import AdamW
-from wandb import wandb
 
 from seamless_communication.cli.m4t.finetune import dataloader, dist_utils
 from seamless_communication.models.unity import (
@@ -32,17 +32,6 @@ from seamless_communication.models.unity import (
 )
 
 logger = logging.getLogger(__name__)
-wandb.init(project="seamless_communication", name="finetune")
-wandb.config.update({
-    "model_name": "seamlessM4T_medium",
-    "finetune_mode": "TEXT_TO_SPEECH",
-    "max_epochs": 50,
-    "warmup_steps": 100,
-    "log_steps": 20,
-    "eval_steps": 100,
-    "learning_rate": 1e-5,
-    "train_batch_size": 8,
-})
 
 class FinetuneMode(Enum):
     SPEECH_TO_SPEECH = "SPEECH_TO_SPEECH"
@@ -300,6 +289,7 @@ class UnitYFinetune:
         self.patience_left: int = self.params.patience
         self.best_eval_loss: Optional[float] = None
         self.is_best_state: bool = False
+        self.enable_wandb = dist_utils.is_main_process() and wandb.run is not None
         torch.set_float32_matmul_precision("high")
 
     def _reset_stats(self) -> None:
@@ -339,10 +329,13 @@ class UnitYFinetune:
         self.patience_left = (
             self.params.patience if self.is_best_state else self.patience_left - 1
         )
-        wandb.log({
-            "eval_loss": eval_loss,
-            "best_eval_loss": self.best_eval_loss
-        })
+        if self.enable_wandb:
+            wandb.log(
+                {
+                    "eval_loss": eval_loss,
+                    "best_eval_loss": self.best_eval_loss,
+                }
+            )
         logger.info(
             f"Eval after {self.update_idx} updates: "
             f"loss={eval_loss:.4f} "
@@ -384,11 +377,13 @@ class UnitYFinetune:
                 f"train loss={avg_loss:.4f} "
                 f"last lr={self.lr_scheduler.get_last_lr()[0]:.2E}"
             )
-        if (self.update_idx+1) % self.params.eval_steps == 0:
-            wandb.log({
-                "train_loss": avg_loss,
-                "last_lr": self.lr_scheduler.get_last_lr()[0]
-            })
+        if (self.update_idx + 1) % self.params.eval_steps == 0 and self.enable_wandb:
+            wandb.log(
+                {
+                    "train_loss": avg_loss,
+                    "last_lr": self.lr_scheduler.get_last_lr()[0],
+                }
+            )
 
     def _train_step(self, batch: List[dataloader.MultimodalSeqsBatch]) -> None:
         """Run one train step"""
