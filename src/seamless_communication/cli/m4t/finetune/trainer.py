@@ -23,6 +23,7 @@ from fairseq2.nn.padding import PaddingMask
 from fairseq2.optim.lr_scheduler import MyleLR
 from fairseq2.typing import Device
 from torch.optim import AdamW
+from wandb import wandb
 
 from seamless_communication.cli.m4t.finetune import dataloader, dist_utils
 from seamless_communication.models.unity import (
@@ -31,7 +32,17 @@ from seamless_communication.models.unity import (
 )
 
 logger = logging.getLogger(__name__)
-
+wandb.init(project="seamless_communication", name="finetune")
+wandb.config.update({
+    "model_name": "seamlessM4T_medium",
+    "finetune_mode": "TEXT_TO_SPEECH",
+    "max_epochs": 50,
+    "warmup_steps": 100,
+    "log_steps": 20,
+    "eval_steps": 100,
+    "learning_rate": 1e-5,
+    "train_batch_size": 8,
+})
 
 class FinetuneMode(Enum):
     SPEECH_TO_SPEECH = "SPEECH_TO_SPEECH"
@@ -62,10 +73,10 @@ class FinetuneParams:
     warmup_steps: int = 100
     """ Number of steps with linearly increasing LR"""
 
-    log_steps: int = 10
+    log_steps: int = 20
     """ Log inner loss after each `log_steps` training steps"""
 
-    eval_steps: int = 50
+    eval_steps: int = 100
     """ Get eval loss after each `eval_steps` training steps """
 
     patience: int = 3
@@ -328,6 +339,10 @@ class UnitYFinetune:
         self.patience_left = (
             self.params.patience if self.is_best_state else self.patience_left - 1
         )
+        wandb.log({
+            "eval_loss": eval_loss,
+            "best_eval_loss": self.best_eval_loss
+        })
         logger.info(
             f"Eval after {self.update_idx} updates: "
             f"loss={eval_loss:.4f} "
@@ -369,6 +384,11 @@ class UnitYFinetune:
                 f"train loss={avg_loss:.4f} "
                 f"last lr={self.lr_scheduler.get_last_lr()[0]:.2E}"
             )
+        if (self.update_idx+1) % self.params.eval_steps == 0:
+            wandb.log({
+                "train_loss": avg_loss,
+                "last_lr": self.lr_scheduler.get_last_lr()[0]
+            })
 
     def _train_step(self, batch: List[dataloader.MultimodalSeqsBatch]) -> None:
         """Run one train step"""
